@@ -2,7 +2,7 @@ import { Pool } from "pg";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("railway.app")
+  ssl: process.env.DATABASE_URL?.includes("railway")
     ? { rejectUnauthorized: false }
     : undefined,
 });
@@ -14,6 +14,124 @@ export async function query(text: string, params?: unknown[]) {
   try {
     const result = await client.query(text, params);
     return result;
+  } finally {
+    client.release();
+  }
+}
+
+let initialized = false;
+
+export async function initDB() {
+  if (initialized) return;
+  initialized = true;
+
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        full_name VARCHAR(200),
+        role VARCHAR(20) NOT NULL DEFAULT 'expert' CHECK (role IN ('admin', 'expert')),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS npa_documents (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        category VARCHAR(50),
+        adilet_url TEXT,
+        filename VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS iterations (
+        id SERIAL PRIMARY KEY,
+        iteration_number INT NOT NULL DEFAULT 1,
+        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+        description TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        completed_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS requirements (
+        id SERIAL PRIMARY KEY,
+        iteration_id INT REFERENCES iterations(id),
+        npa_document_id INT REFERENCES npa_documents(id),
+        external_id VARCHAR(20),
+        category VARCHAR(10) NOT NULL,
+        text_original TEXT NOT NULL,
+        text_summary TEXT,
+        article_ref TEXT,
+        subject VARCHAR(10),
+        expert_category VARCHAR(20),
+        confidence VARCHAR(20) DEFAULT 'medium',
+        detection_method VARCHAR(30) DEFAULT 'regex',
+        admin_status VARCHAR(20) DEFAULT 'active',
+        admin_reject_reason TEXT,
+        gold_standard_id VARCHAR(20),
+        gold_standard_title TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS expert_votes (
+        id SERIAL PRIMARY KEY,
+        requirement_id INT REFERENCES requirements(id) ON DELETE CASCADE,
+        user_id INT REFERENCES users(id),
+        iteration_id INT REFERENCES iterations(id),
+        vote VARCHAR(20) NOT NULL CHECK (vote IN ('confirm', 'reject', 'uncertain')),
+        comment TEXT,
+        voted_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(requirement_id, user_id, iteration_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id),
+        action VARCHAR(100) NOT NULL,
+        details JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_requirements_iteration ON requirements(iteration_id);
+      CREATE INDEX IF NOT EXISTS idx_requirements_category ON requirements(category);
+      CREATE INDEX IF NOT EXISTS idx_requirements_npa ON requirements(npa_document_id);
+      CREATE INDEX IF NOT EXISTS idx_requirements_admin_status ON requirements(admin_status);
+      CREATE INDEX IF NOT EXISTS idx_votes_requirement ON expert_votes(requirement_id);
+      CREATE INDEX IF NOT EXISTS idx_votes_user ON expert_votes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_votes_iteration ON expert_votes(iteration_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id);
+    `);
+    // Seed default admin user if no users exist
+    const userCount = await client.query("SELECT COUNT(*) FROM users");
+    if (parseInt(userCount.rows[0].count) === 0) {
+      const bcrypt = await import("bcryptjs");
+      const users = [
+        { username: "admin", password: "admin_npa2026!", fullName: "Администратор", role: "admin" },
+        { username: "expert_1", password: "expert1_npa2026!", fullName: "Эксперт 1", role: "expert" },
+        { username: "expert_2", password: "expert2_npa2026!", fullName: "Эксперт 2", role: "expert" },
+        { username: "expert_3", password: "expert3_npa2026!", fullName: "Эксперт 3", role: "expert" },
+        { username: "expert_4", password: "expert4_npa2026!", fullName: "Эксперт 4", role: "expert" },
+      ];
+      for (const u of users) {
+        const hash = await bcrypt.hash(u.password, 10);
+        await client.query(
+          "INSERT INTO users (username, password_hash, full_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+          [u.username, hash, u.fullName, u.role]
+        );
+      }
+      // Create initial iteration
+      await client.query(
+        "INSERT INTO iterations (iteration_number, status, description) VALUES (1, 'active', 'Первичная экспертиза') ON CONFLICT DO NOTHING"
+      );
+      console.log("Default users and iteration seeded");
+    }
+    console.log("Database tables initialized");
+  } catch (err) {
+    console.error("DB init error:", err);
   } finally {
     client.release();
   }
