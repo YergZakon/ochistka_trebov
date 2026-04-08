@@ -54,12 +54,20 @@ export default function Header() {
                 Оценка
               </button>
               {user.role === "admin" && (
-                <button
-                  onClick={() => router.push("/admin")}
-                  className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                >
-                  Админ
-                </button>
+                <>
+                  <button
+                    onClick={() => router.push("/quality")}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                  >
+                    Качество
+                  </button>
+                  <button
+                    onClick={() => router.push("/admin")}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                  >
+                    Админ
+                  </button>
+                </>
               )}
             </nav>
           </div>

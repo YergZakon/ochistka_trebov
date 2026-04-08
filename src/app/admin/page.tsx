@@ -42,7 +42,7 @@ const SPHERES = [
 ];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"requirements" | "users">("requirements");
+  const [activeTab, setActiveTab] = useState<"requirements" | "users" | "iterations">("requirements");
   const router = useRouter();
 
   return (
@@ -71,12 +71,24 @@ export default function AdminPage() {
           >
             Пользователи
           </button>
+          <button
+            onClick={() => setActiveTab("iterations")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "iterations"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Итерации
+          </button>
         </div>
 
         {activeTab === "requirements" ? (
           <RequirementsTab router={router} />
-        ) : (
+        ) : activeTab === "users" ? (
           <UsersTab router={router} />
+        ) : (
+          <IterationsTab router={router} />
         )}
       </main>
     </div>
@@ -525,6 +537,176 @@ function UsersTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/* ==================== Iterations Tab ==================== */
+
+interface Iteration {
+  id: number;
+  iteration_number: number;
+  status: string;
+  description: string;
+  created_at: string;
+  completed_at: string | null;
+  req_count: string;
+  vote_count: string;
+}
+
+function IterationsTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const [iterations, setIterations] = useState<Iteration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [description, setDescription] = useState("");
+  const [formLoading, setFormLoading] = useState(false);
+
+  const fetchIterations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/iterations");
+      if (!res.ok) throw new Error("unauthorized");
+      const data = await res.json();
+      setIterations(data.iterations);
+    } catch {
+      router.push("/login");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    fetchIterations();
+  }, [fetchIterations]);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!description.trim()) return;
+    setFormLoading(true);
+    try {
+      const res = await fetch("/api/admin/iterations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      if (res.ok) {
+        setDescription("");
+        setShowForm(false);
+        fetchIterations();
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
+  async function handleAction(iterationId: number, action: "complete" | "archive") {
+    await fetch("/api/admin/iterations", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iterationId, action }),
+    });
+    fetchIterations();
+  }
+
+  const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+    active: { label: "Активна", color: "bg-green-100 text-green-700" },
+    completed: { label: "Завершена", color: "bg-blue-100 text-blue-700" },
+    archived: { label: "Архив", color: "bg-slate-100 text-slate-500" },
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="text-slate-400">Загрузка...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-sm font-semibold text-slate-700">
+          Итераций: {iterations.length}
+        </h3>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          {showForm ? "Отмена" : "Новая итерация"}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-white rounded-lg border border-slate-200 p-4 mb-6 flex gap-3">
+          <input
+            type="text"
+            placeholder="Описание итерации"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            required
+          />
+          <button
+            type="submit"
+            disabled={formLoading}
+            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            {formLoading ? "Создание..." : "Создать"}
+          </button>
+        </form>
+      )}
+
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">#</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Описание</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-slate-500">Статус</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-slate-500">Требований</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-slate-500">Голосов</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Создана</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-slate-500">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {iterations.map((it) => {
+              const st = STATUS_LABELS[it.status] || { label: it.status, color: "bg-slate-100" };
+              return (
+                <tr key={it.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2 font-medium">{it.iteration_number}</td>
+                  <td className="px-4 py-2 text-slate-600">{it.description}</td>
+                  <td className="px-4 py-2 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                  </td>
+                  <td className="px-4 py-2 text-center">{it.req_count}</td>
+                  <td className="px-4 py-2 text-center">{it.vote_count}</td>
+                  <td className="px-4 py-2 text-xs text-slate-500">
+                    {new Date(it.created_at).toLocaleDateString("ru-RU")}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {it.status === "active" && (
+                      <button
+                        onClick={() => handleAction(it.id, "complete")}
+                        className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      >
+                        Завершить
+                      </button>
+                    )}
+                    {it.status === "completed" && (
+                      <button
+                        onClick={() => handleAction(it.id, "archive")}
+                        className="text-xs px-3 py-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100"
+                      >
+                        В архив
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
