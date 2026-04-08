@@ -67,7 +67,7 @@ export async function initDB() {
         text_original TEXT NOT NULL,
         text_summary TEXT,
         article_ref TEXT,
-        subject VARCHAR(10),
+        subject VARCHAR(50),
         expert_category VARCHAR(20),
         confidence VARCHAR(20) DEFAULT 'medium',
         detection_method VARCHAR(30) DEFAULT 'regex',
