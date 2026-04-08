@@ -43,6 +43,7 @@ export async function initDB() {
         code VARCHAR(50) UNIQUE NOT NULL,
         title TEXT NOT NULL,
         category VARCHAR(50),
+        sphere VARCHAR(30) DEFAULT 'land',
         adilet_url TEXT,
         filename VARCHAR(255),
         created_at TIMESTAMP DEFAULT NOW()
@@ -104,6 +105,10 @@ export async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_votes_user ON expert_votes(user_id);
       CREATE INDEX IF NOT EXISTS idx_votes_iteration ON expert_votes(iteration_id);
       CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id);
+      CREATE INDEX IF NOT EXISTS idx_npa_sphere ON npa_documents(sphere);
+
+      -- Add sphere column to existing databases
+      ALTER TABLE npa_documents ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land';
     `);
     // Seed default admin user if no users exist
     const userCount = await client.query("SELECT COUNT(*) FROM users");

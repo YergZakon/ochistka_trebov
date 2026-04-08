@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(url.searchParams.get("limit") || "20");
   const category = url.searchParams.get("category");
   const npaId = url.searchParams.get("npa_id");
+  const sphere = url.searchParams.get("sphere");
   const status = url.searchParams.get("status") || "active";
   const voteStatus = url.searchParams.get("vote_status"); // voted | unvoted | all
   const offset = (page - 1) * limit;
@@ -29,6 +30,11 @@ export async function GET(req: NextRequest) {
     params.push(parseInt(npaId));
     paramIdx++;
   }
+  if (sphere) {
+    where += ` AND n.sphere = $${paramIdx}`;
+    params.push(sphere);
+    paramIdx++;
+  }
 
   // Подзапрос для текущего голоса пользователя
   const voteJoin = `
@@ -44,8 +50,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Общее количество
+  const npaJoin = "LEFT JOIN npa_documents n ON n.id = r.npa_document_id";
   const countResult = await query(
-    `SELECT COUNT(*) FROM requirements r ${voteJoin} ${where}`,
+    `SELECT COUNT(*) FROM requirements r ${npaJoin} ${voteJoin} ${where}`,
     params
   );
   const total = parseInt(countResult.rows[0].count);
@@ -55,7 +62,7 @@ export async function GET(req: NextRequest) {
     `SELECT r.id, r.external_id, r.category, r.text_original, r.text_summary,
             r.article_ref, r.subject, r.expert_category, r.confidence,
             r.detection_method, r.admin_status, r.gold_standard_title,
-            n.title as npa_title, n.code as npa_code,
+            n.title as npa_title, n.code as npa_code, n.sphere,
             v.vote as my_vote, v.comment as my_comment,
             (SELECT COUNT(*) FROM expert_votes WHERE requirement_id = r.id AND iteration_id = r.iteration_id AND vote = 'confirm') as confirms,
             (SELECT COUNT(*) FROM expert_votes WHERE requirement_id = r.id AND iteration_id = r.iteration_id AND vote = 'reject') as rejects,

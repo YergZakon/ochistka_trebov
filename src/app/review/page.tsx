@@ -44,6 +44,7 @@ export default function ReviewPage() {
     totalPages: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [sphere, setSphere] = useState("");
   const [category, setCategory] = useState("");
   const [voteStatus, setVoteStatus] = useState("unvoted");
   const [npaId, setNpaId] = useState("");
@@ -59,6 +60,7 @@ export default function ReviewPage() {
           status: "active",
           vote_status: voteStatus,
         });
+        if (sphere) params.set("sphere", sphere);
         if (category) params.set("category", category);
         if (npaId) params.set("npa_id", npaId);
 
@@ -73,7 +75,7 @@ export default function ReviewPage() {
         setLoading(false);
       }
     },
-    [category, voteStatus, npaId, router]
+    [sphere, category, voteStatus, npaId, router]
   );
 
   useEffect(() => {
@@ -121,6 +123,11 @@ export default function ReviewPage() {
         {/* Filters */}
         <div className="mb-4">
           <Filters
+            sphere={sphere}
+            onSphereChange={(v) => {
+              setSphere(v);
+              setNpaId("");
+            }}
             category={category}
             onCategoryChange={(v) => {
               setCategory(v);

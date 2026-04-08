@@ -12,6 +12,7 @@ interface Stats {
   };
   byCategory: { category: string; count: string }[];
   byNpa: { title: string; count: string }[];
+  bySphere: { sphere: string; count: string }[];
   expertProgress: {
     username: string;
     full_name: string;
@@ -24,6 +25,18 @@ interface Stats {
     disputed: string;
   };
 }
+
+const SPHERE_NAMES: Record<string, string> = {
+  land: "Земельные",
+  ecology: "Экология",
+  transport: "Транспорт",
+};
+
+const SPHERE_COLORS: Record<string, string> = {
+  land: "text-amber-600",
+  ecology: "text-green-600",
+  transport: "text-blue-600",
+};
 
 const CATEGORY_NAMES: Record<string, string> = {
   OBL: "Обязанность",
@@ -111,6 +124,22 @@ export default function DashboardPage() {
             color="text-purple-600"
           />
         </div>
+
+        {/* Sphere distribution */}
+        {stats.bySphere && stats.bySphere.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {stats.bySphere.map((s) => (
+              <div key={s.sphere} className="bg-white rounded-lg border border-slate-200 p-4">
+                <div className={`text-2xl font-bold ${SPHERE_COLORS[s.sphere] || "text-slate-600"}`}>
+                  {s.count}
+                </div>
+                <div className="text-sm text-slate-500">
+                  {SPHERE_NAMES[s.sphere] || s.sphere}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Consensus */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -242,13 +271,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick action */}
-        <div className="mt-6 flex justify-center">
+        {/* Actions */}
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => router.push("/review")}
             className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Перейти к оценке требований →
+            Перейти к оценке требований
+          </button>
+          <button
+            onClick={() => window.open("/api/export?format=csv", "_blank")}
+            className="px-5 py-3 bg-slate-600 text-white font-medium rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            Экспорт CSV
+          </button>
+          <button
+            onClick={() => window.open("/api/export?format=json", "_blank")}
+            className="px-5 py-3 bg-slate-500 text-white font-medium rounded-lg hover:bg-slate-600 transition-colors"
+          >
+            Экспорт JSON
           </button>
         </div>
       </main>

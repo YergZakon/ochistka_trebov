@@ -61,10 +61,20 @@ export async function GET() {
       ) as disputed
   `);
 
+  // По сферам
+  const bySphere = await query(`
+    SELECT COALESCE(n.sphere, 'land') as sphere, COUNT(*) as count
+    FROM requirements r
+    LEFT JOIN npa_documents n ON n.id = r.npa_document_id
+    WHERE r.admin_status = 'active'
+    GROUP BY n.sphere ORDER BY count DESC
+  `);
+
   return NextResponse.json({
     overview: stats.rows[0],
     byCategory: byCategory.rows,
     byNpa: byNpa.rows,
+    bySphere: bySphere.rows,
     expertProgress: expertProgress.rows,
     consensus: consensus.rows[0],
   });

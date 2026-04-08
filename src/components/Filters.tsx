@@ -1,6 +1,8 @@
 "use client";
 
 interface FiltersProps {
+  sphere?: string;
+  onSphereChange?: (v: string) => void;
   category: string;
   onCategoryChange: (v: string) => void;
   voteStatus: string;
@@ -9,6 +11,13 @@ interface FiltersProps {
   npaId: string;
   onNpaChange: (v: string) => void;
 }
+
+const SPHERES = [
+  { value: "", label: "Все сферы" },
+  { value: "land", label: "Земельные" },
+  { value: "ecology", label: "Экология" },
+  { value: "transport", label: "Транспорт" },
+];
 
 const CATEGORIES = [
   { value: "", label: "Все категории" },
@@ -29,7 +38,12 @@ const VOTE_STATUSES = [
   { value: "voted", label: "Оценённые" },
 ];
 
+const selectClass =
+  "text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none";
+
 export default function Filters({
+  sphere,
+  onSphereChange,
   category,
   onCategoryChange,
   voteStatus,
@@ -40,10 +54,24 @@ export default function Filters({
 }: FiltersProps) {
   return (
     <div className="flex flex-wrap gap-3 items-center">
+      {onSphereChange && (
+        <select
+          value={sphere || ""}
+          onChange={(e) => onSphereChange(e.target.value)}
+          className={selectClass}
+        >
+          {SPHERES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      )}
+
       <select
         value={category}
         onChange={(e) => onCategoryChange(e.target.value)}
-        className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        className={selectClass}
       >
         {CATEGORIES.map((c) => (
           <option key={c.value} value={c.value}>
@@ -55,7 +83,7 @@ export default function Filters({
       <select
         value={voteStatus}
         onChange={(e) => onVoteStatusChange(e.target.value)}
-        className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        className={selectClass}
       >
         {VOTE_STATUSES.map((v) => (
           <option key={v.value} value={v.value}>
@@ -68,7 +96,7 @@ export default function Filters({
         <select
           value={npaId}
           onChange={(e) => onNpaChange(e.target.value)}
-          className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-w-xs"
+          className={`${selectClass} max-w-xs`}
         >
           <option value="">Все НПА</option>
           {npaList.map((n) => (
