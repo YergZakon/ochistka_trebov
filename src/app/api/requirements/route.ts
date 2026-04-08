@@ -16,13 +16,33 @@ export async function GET(req: NextRequest) {
     const category = url.searchParams.get("category");
     const npaId = url.searchParams.get("npa_id");
     const sphere = url.searchParams.get("sphere");
+    const iterationId = url.searchParams.get("iteration_id");
     const status = url.searchParams.get("status") || "active";
     const voteStatus = url.searchParams.get("vote_status"); // voted | unvoted | all
     const offset = (page - 1) * limit;
 
+    // Default to active iteration if not specified
+    let activeIterationId: number | null = null;
+    if (iterationId) {
+      activeIterationId = parseInt(iterationId);
+    } else {
+      const iterResult = await query(
+        "SELECT id FROM iterations WHERE status = 'active' ORDER BY iteration_number DESC LIMIT 1"
+      );
+      if (iterResult.rows.length > 0) {
+        activeIterationId = iterResult.rows[0].id;
+      }
+    }
+
     let where = "WHERE r.admin_status = $1";
     const params: unknown[] = [status];
     let paramIdx = 2;
+
+    if (activeIterationId) {
+      where += ` AND r.iteration_id = $${paramIdx}`;
+      params.push(activeIterationId);
+      paramIdx++;
+    }
 
     if (category) {
       where += ` AND r.category = $${paramIdx}`;

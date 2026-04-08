@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     await initDB();
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+    if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
 
     const url = new URL(req.url);
     const sphere = url.searchParams.get("sphere");
@@ -34,10 +35,14 @@ export async function GET(req: NextRequest) {
       idx++;
     }
 
-    // Fetch requirements with aggregated votes
+    // Filter by iteration on both requirements and votes
     let voteFilter = "";
     if (iterationId) {
-      voteFilter = ` AND ev.iteration_id = ${parseInt(iterationId)}`;
+      const itId = parseInt(iterationId);
+      where += ` AND r.iteration_id = $${idx}`;
+      params.push(itId);
+      idx++;
+      voteFilter = ` AND ev.iteration_id = ${itId}`;
     }
 
     const result = await query(

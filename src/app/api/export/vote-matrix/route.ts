@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     await initDB();
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+    if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
 
     const url = new URL(req.url);
     const format = url.searchParams.get("format") || "csv";
@@ -46,6 +47,11 @@ export async function GET(req: NextRequest) {
     if (category) {
       where += ` AND r.category = $${idx}`;
       params.push(category);
+      idx++;
+    }
+    if (iterationId) {
+      where += ` AND r.iteration_id = $${idx}`;
+      params.push(parseInt(iterationId));
       idx++;
     }
 
@@ -79,6 +85,12 @@ export async function GET(req: NextRequest) {
       voteWhere += ` AND ev.iteration_id = $${vIdx}`;
       voteParams.push(parseInt(iterationId));
       vIdx++;
+    }
+
+    // Only count votes from active experts for consistency
+    const activeExpertIds = experts.map((e) => e.id);
+    if (activeExpertIds.length > 0) {
+      voteWhere += ` AND ev.user_id IN (${activeExpertIds.join(",")})`;
     }
 
     const votesResult = await query(

@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     await initDB();
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+    if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
 
     const url = new URL(req.url);
     const sphere = url.searchParams.get("sphere");
