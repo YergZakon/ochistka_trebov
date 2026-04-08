@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { query, initDB } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 function escapeCSV(value: string | null | undefined): string {
   if (value == null) return "";
@@ -12,6 +14,7 @@ function escapeCSV(value: string | null | undefined): string {
 }
 
 export async function GET(req: NextRequest) {
+  await initDB();
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
 

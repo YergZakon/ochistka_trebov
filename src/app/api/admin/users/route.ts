@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { query, initDB } from "@/lib/db";
 
 export async function GET() {
+  await initDB();
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
   if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
@@ -15,6 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  await initDB();
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
   if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  await initDB();
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
   if (user.role !== "admin") return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
