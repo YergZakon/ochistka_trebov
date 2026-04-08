@@ -69,11 +69,10 @@ export async function GET() {
     let bySphere = [];
     try {
       const sphereResult = await query(`
-        SELECT COALESCE(n.sphere, 'land') as sphere, COUNT(*) as count
+        SELECT COALESCE(r.sphere, 'land') as sphere, COUNT(*) as count
         FROM requirements r
-        LEFT JOIN npa_documents n ON n.id = r.npa_document_id
         WHERE r.admin_status = 'active'
-        GROUP BY n.sphere ORDER BY count DESC
+        GROUP BY r.sphere ORDER BY count DESC
       `);
       bySphere = sphereResult.rows;
     } catch {

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       paramIdx++;
     }
     if (sphere) {
-      where += ` AND n.sphere = $${paramIdx}`;
+      where += ` AND r.sphere = $${paramIdx}`;
       params.push(sphere);
       paramIdx++;
     }
@@ -61,21 +61,13 @@ export async function GET(req: NextRequest) {
     );
     const total = parseInt(countResult.rows[0].count);
 
-    // Проверяем наличие колонки sphere
-    let sphereSelect = "NULL as sphere";
-    try {
-      await query("SELECT sphere FROM npa_documents LIMIT 0");
-      sphereSelect = "n.sphere";
-    } catch {
-      // column doesn't exist yet
-    }
-
     // Данные
     const result = await query(
       `SELECT r.id, r.external_id, r.category, r.text_original, r.text_summary,
               r.article_ref, r.subject, r.expert_category, r.confidence,
               r.detection_method, r.admin_status, r.gold_standard_title,
-              n.title as npa_title, n.code as npa_code, ${sphereSelect},
+              r.sphere,
+              n.title as npa_title, n.code as npa_code,
               v.vote as my_vote, v.comment as my_comment,
               (SELECT COUNT(*) FROM expert_votes WHERE requirement_id = r.id AND iteration_id = r.iteration_id AND vote = 'confirm') as confirms,
               (SELECT COUNT(*) FROM expert_votes WHERE requirement_id = r.id AND iteration_id = r.iteration_id AND vote = 'reject') as rejects,

@@ -75,6 +75,7 @@ export async function initDB() {
         admin_reject_reason TEXT,
         gold_standard_id VARCHAR(20),
         gold_standard_title TEXT,
+        sphere VARCHAR(30) DEFAULT 'land',
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -109,6 +110,8 @@ export async function initDB() {
 
       -- Add sphere column to existing databases
       ALTER TABLE npa_documents ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land';
+      ALTER TABLE requirements ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land';
+      CREATE INDEX IF NOT EXISTS idx_requirements_sphere ON requirements(sphere);
     `);
     // Seed default admin user if no users exist
     const userCount = await client.query("SELECT COUNT(*) FROM users");

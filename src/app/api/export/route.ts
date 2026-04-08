@@ -29,15 +29,8 @@ export async function GET(req: NextRequest) {
     const params: unknown[] = [status];
     let paramIdx = 2;
 
-    // Check if sphere column exists
-    let hasSphere = false;
-    try {
-      await query("SELECT sphere FROM npa_documents LIMIT 0");
-      hasSphere = true;
-    } catch { /* column doesn't exist */ }
-
-    if (sphere && hasSphere) {
-      where += ` AND n.sphere = $${paramIdx}`;
+    if (sphere) {
+      where += ` AND r.sphere = $${paramIdx}`;
       params.push(sphere);
       paramIdx++;
     }
@@ -47,13 +40,10 @@ export async function GET(req: NextRequest) {
       paramIdx++;
     }
 
-    const sphereSelect = hasSphere ? "COALESCE(n.sphere, 'land') as sphere" : "'land' as sphere";
-    const sphereGroupBy = hasSphere ? ", n.sphere" : "";
-
     const result = await query(
       `SELECT r.id, r.external_id, r.category, r.text_original, r.text_summary,
               r.article_ref, r.subject, r.admin_status,
-              n.title as npa_title, ${sphereSelect},
+              n.title as npa_title, COALESCE(r.sphere, 'land') as sphere,
               COUNT(v.id) FILTER (WHERE v.vote = 'confirm') as confirms,
               COUNT(v.id) FILTER (WHERE v.vote = 'reject') as rejects,
               COUNT(v.id) FILTER (WHERE v.vote = 'uncertain') as uncertain,
@@ -63,7 +53,7 @@ export async function GET(req: NextRequest) {
        LEFT JOIN expert_votes v ON v.requirement_id = r.id
        ${where}
        GROUP BY r.id, r.external_id, r.category, r.text_original, r.text_summary,
-                r.article_ref, r.subject, r.admin_status, n.title${sphereGroupBy}
+                r.article_ref, r.subject, r.admin_status, n.title, r.sphere
        ORDER BY r.id`,
       params
     );
@@ -80,7 +70,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // CSV with BOM for Excel Cyrillic support
     const headers = [
       "ID", "External_ID", "Категория", "Текст", "Резюме",
       "Статья", "Субъект", "НПА", "Сфера", "Статус",

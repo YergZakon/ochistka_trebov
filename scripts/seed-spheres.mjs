@@ -19,12 +19,16 @@ const pool = new pg.Pool({
 async function run() {
   const client = await pool.connect();
   try {
-    // Ensure sphere column exists
+    // Ensure sphere column exists on requirements
     await client.query(
-      "ALTER TABLE npa_documents ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land'"
+      "ALTER TABLE requirements ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land'"
     );
     await client.query(
-      "CREATE INDEX IF NOT EXISTS idx_npa_sphere ON npa_documents(sphere)"
+      "CREATE INDEX IF NOT EXISTS idx_requirements_sphere ON requirements(sphere)"
+    );
+    // Also keep sphere on npa_documents for reference
+    await client.query(
+      "ALTER TABLE npa_documents ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land'"
     );
 
     // Get or create iteration
@@ -40,22 +44,30 @@ async function run() {
     }
     console.log(`Using iteration id=${iterationId}`);
 
+    // Clear previously loaded ecology/transport requirements for clean re-seed
+    const deleted = await client.query(
+      "DELETE FROM requirements WHERE sphere IN ('ecology', 'transport')"
+    );
+    if (deleted.rowCount > 0) {
+      console.log(`Cleared ${deleted.rowCount} existing ecology/transport requirements`);
+    }
+
     // Files to load
     const files = [
-      { path: path.resolve(__dirname, "../requirements_transport.json"), sphere: null },
-      { path: path.resolve(__dirname, "../requirements_ecology.json"), sphere: null },
+      path.resolve(__dirname, "../requirements_transport.json"),
+      path.resolve(__dirname, "../requirements_ecology.json"),
     ];
 
     let totalLoaded = 0;
 
-    for (const file of files) {
-      if (!fs.existsSync(file.path)) {
-        console.warn(`File not found: ${file.path}, skipping`);
+    for (const filePath of files) {
+      if (!fs.existsSync(filePath)) {
+        console.warn(`File not found: ${filePath}, skipping`);
         continue;
       }
 
-      const data = JSON.parse(fs.readFileSync(file.path, "utf-8"));
-      const sphere = data.metadata?.sphere || file.sphere || "unknown";
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      const sphere = data.metadata?.sphere || "unknown";
       const requirements = data.requirements || [];
       console.log(`\nLoading ${requirements.length} requirements from sphere "${sphere}"...`);
 
@@ -69,46 +81,31 @@ async function run() {
       for (const title of uniqueNpas) {
         const code = title.substring(0, 50).replace(/[^a-zA-Zа-яА-Я0-9_\-]/g, "_");
         const res = await client.query(
-          `INSERT INTO npa_documents (code, title, category, sphere)
-           VALUES ($1, $2, 'закон', $3)
-           ON CONFLICT (code) DO UPDATE SET sphere = $3
+          `INSERT INTO npa_documents (code, title, category)
+           VALUES ($1, $2, 'закон')
+           ON CONFLICT (code) DO UPDATE SET title = $2
            RETURNING id`,
-          [code, title, sphere]
+          [code, title]
         );
         npaMap.set(title, res.rows[0].id);
       }
       console.log(`  ${npaMap.size} NPA documents created/updated`);
 
-      // Check for existing requirements to avoid duplicates
+      // Insert requirements with sphere set on the requirement itself
       let loaded = 0;
-      let skipped = 0;
       for (const r of requirements) {
-        const externalId = r.id || null;
-
-        // Skip if this external_id already exists
-        if (externalId) {
-          const existing = await client.query(
-            "SELECT id FROM requirements WHERE external_id = $1",
-            [externalId]
-          );
-          if (existing.rows.length > 0) {
-            skipped++;
-            continue;
-          }
-        }
-
         const npaTitle = r.npa_title;
         const npaId = npaMap.get(npaTitle) || null;
 
         await client.query(
           `INSERT INTO requirements
             (iteration_id, npa_document_id, external_id, category, text_original,
-             text_summary, article_ref, subject, confidence, detection_method, admin_status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+             text_summary, article_ref, subject, confidence, detection_method, admin_status, sphere)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [
             iterationId,
             npaId,
-            externalId,
+            r.id || null,
             r.category || "OBL",
             r.text || "",
             r.summary || null,
@@ -117,31 +114,25 @@ async function run() {
             "high",
             "claude_analysis",
             "active",
+            sphere,
           ]
         );
         loaded++;
       }
-      console.log(`  ${loaded} requirements loaded, ${skipped} skipped (duplicates)`);
+      console.log(`  ${loaded} requirements loaded`);
       totalLoaded += loaded;
     }
 
     // Stats
-    const stats = await client.query(`
-      SELECT
-        (SELECT COUNT(*) FROM requirements WHERE admin_status = 'active') as reqs,
-        (SELECT COUNT(*) FROM npa_documents) as npas
-    `);
-
     const bySphere = await client.query(`
-      SELECT n.sphere, COUNT(*) as count
-      FROM requirements r
-      JOIN npa_documents n ON n.id = r.npa_document_id
-      GROUP BY n.sphere
+      SELECT sphere, COUNT(*) as count
+      FROM requirements
+      WHERE admin_status = 'active'
+      GROUP BY sphere
       ORDER BY count DESC
     `);
 
     console.log(`\nDONE: ${totalLoaded} new requirements loaded`);
-    console.log(`Total: ${stats.rows[0].reqs} requirements, ${stats.rows[0].npas} NPAs`);
     console.log("By sphere:");
     for (const row of bySphere.rows) {
       console.log(`  ${row.sphere}: ${row.count}`);
