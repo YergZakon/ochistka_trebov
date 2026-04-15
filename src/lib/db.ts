@@ -112,6 +112,7 @@ export async function initDB() {
       ALTER TABLE npa_documents ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land';
       ALTER TABLE requirements ADD COLUMN IF NOT EXISTS sphere VARCHAR(30) DEFAULT 'land';
       CREATE INDEX IF NOT EXISTS idx_requirements_sphere ON requirements(sphere);
+      CREATE INDEX IF NOT EXISTS idx_votes_req_iter_vote ON expert_votes(requirement_id, iteration_id, vote);
     `);
     // Seed default admin user if no users exist
     const userCount = await client.query("SELECT COUNT(*) FROM users");
